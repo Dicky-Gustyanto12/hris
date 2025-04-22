@@ -56,7 +56,7 @@ Route::post('team/update/{id}', [TeamController::class, 'update'])->middleware('
 Route::get('team', [TeamController::class, 'fetch'])->middleware('auth:sanctum');
 
 // Rute untuk menghapus team
-Route::delete('team/{id}', [TeamController::class, 'delete'])->middleware('auth:sanctum');
+Route::delete('team/{id}', [TeamController::class, 'destroy'])->middleware('auth:sanctum');
 
 
 // Role API

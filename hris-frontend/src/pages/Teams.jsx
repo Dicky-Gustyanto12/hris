@@ -9,6 +9,7 @@ const Teams = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [newTeam, setNewTeam] = useState({ name: "", icon: null });
+  const [editTeam, setEditTeam] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,7 +52,7 @@ const Teams = () => {
       .finally(() => setLoading(false));
   };
 
-  const handleCreateTeam = () => {
+  const handleCreateOrUpdateTeam = () => {
     const companyId = localStorage.getItem("company_id");
     const { name, icon } = newTeam;
 
@@ -67,35 +68,69 @@ const Teams = () => {
     const formData = new FormData();
     formData.append("name", name.trim());
     formData.append("company_id", companyId);
-    if (icon) {
-      formData.append("icon", icon);
-    }
+    if (icon) formData.append("icon", icon);
 
-    api
-      .post("/api/team", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      })
+    const request = editTeam
+      ? api.post(`/api/team/update/${editTeam.id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+      : api.post("/api/team", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+    request
       .then((res) => {
         Swal.fire({
           icon: "success",
-          title: "Berhasil",
-          text: `${res.data.data.name} berhasil dibuat.`,
+          title: editTeam ? "Tim Diperbarui" : "Tim Dibuat",
+          text: `${res.data.data.name} berhasil ${
+            editTeam ? "diperbarui" : "dibuat"
+          }.`,
           timer: 1200,
           showConfirmButton: false,
         });
         setShowModal(false);
         setNewTeam({ name: "", icon: null });
+        setEditTeam(null);
         fetchTeams();
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Update/Create error:", error);
         Swal.fire({
           icon: "error",
-          title: "Gagal Menambahkan Tim",
+          title: editTeam ? "Gagal Memperbarui Tim" : "Gagal Menambahkan Tim",
           text: "Silakan coba lagi.",
         });
       });
+  };
+
+  const handleDelete = (id) => {
+    Swal.fire({
+      title: "Yakin hapus tim ini?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Hapus",
+      cancelButtonText: "Batal",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        api
+          .delete(`/api/team/${id}`)
+          .then(() => {
+            Swal.fire("Terhapus!", "Tim berhasil dihapus.", "success");
+            fetchTeams();
+          })
+          .catch(() => {
+            Swal.fire("Gagal!", "Tidak dapat menghapus tim.", "error");
+          });
+      }
+    });
+  };
+
+  const handleEdit = (team) => {
+    const companyId = localStorage.getItem("company_id");
+    setEditTeam(team);
+    setNewTeam({ name: team.name, icon: null });
+    setShowModal(true);
   };
 
   return (
@@ -145,19 +180,35 @@ const Teams = () => {
             {teams.map((team) => (
               <div
                 key={team.id}
-                className="rounded-2xl p-6 bg-white flex flex-col items-center text-center shadow-sm hover:shadow-md transition"
+                className="rounded-2xl p-6 bg-white shadow flex flex-col justify-between"
               >
-                <div className="p-4 rounded-full mb-4 bg-gray-100">
-                  <img
-                    src={team.icon || "/default-icon.svg"}
-                    alt="icon"
-                    className="w-8 h-8 object-contain"
-                  />
+                <div className="flex flex-col items-center text-center">
+                  <div className="p-4 rounded-full mb-4 bg-gray-100">
+                    <img
+                      src={team.icon || "/default-icon.svg"}
+                      alt="icon"
+                      className="w-8 h-8 object-contain"
+                    />
+                  </div>
+                  <h3 className="font-semibold text-gray-800">{team.name}</h3>
+                  <p className="text-gray-500 text-sm">
+                    {team.employees_count || 0} People
+                  </p>
                 </div>
-                <h3 className="font-semibold text-gray-800">{team.name}</h3>
-                <p className="text-gray-500 text-sm">
-                  {team.employees_count || 0} People
-                </p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => handleEdit(team)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-error btn-sm text-white"
+                    onClick={() => handleDelete(team.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -175,7 +226,7 @@ const Teams = () => {
           <div className="fixed inset-0 flex items-center justify-center z-30 px-4">
             <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Buat Tim Baru
+                {editTeam ? "Edit Tim" : "Buat Tim Baru"}
               </h2>
 
               <input
@@ -225,15 +276,16 @@ const Teams = () => {
                   onClick={() => {
                     setShowModal(false);
                     setNewTeam({ name: "", icon: null });
+                    setEditTeam(null);
                   }}
                 >
                   Batal
                 </button>
                 <button
                   className="btn btn-success text-white"
-                  onClick={handleCreateTeam}
+                  onClick={handleCreateOrUpdateTeam}
                 >
-                  Daftar Tim
+                  {editTeam ? "Perbarui" : "Daftar Tim"}
                 </button>
               </div>
             </div>

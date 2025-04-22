@@ -12,19 +12,23 @@ use App\Http\Requests\UpdateTeamRequest;
 
 class TeamController extends Controller
 {
+    private function makeIconPublicUrl($path)
+    {
+        return $path ? asset('storage/' . ltrim(str_replace('public/', '', $path), '/')) : null;
+    }
+
     public function create(CreateTeamRequest $request)
     {
         try {
             $path = null;
 
             if ($request->hasFile('icon')) {
-                // ✅ Simpan ke storage/app/public/icons
                 $path = $request->file('icon')->store('icons', 'public');
             }
 
             $team = Team::create([
                 'name' => $request->name,
-                'icon' => $path,
+                'icon' => $path ?? '',
                 'company_id' => $request->company_id,
             ]);
 
@@ -32,8 +36,7 @@ class TeamController extends Controller
                 throw new Exception('Team creation failed');
             }
 
-            // ✅ Konversi path icon ke URL publik
-            $team->icon = $team->icon ? asset('storage/' . $team->icon) : null;
+            $team->icon = $this->makeIconPublicUrl($team->icon);
 
             return ResponseFormatter::success($team, 'Team created successfully');
         } catch (Exception $e) {
@@ -52,7 +55,7 @@ class TeamController extends Controller
         if ($id) {
             $team = $teamQuery->find($id);
             if ($team) {
-                $team->icon = $team->icon ? asset('storage/' . $team->icon) : null;
+                $team->icon = $this->makeIconPublicUrl($team->icon);
                 return ResponseFormatter::success($team, 'Team found');
             }
             return ResponseFormatter::error('Team not found', 404);
@@ -65,12 +68,45 @@ class TeamController extends Controller
 
         $paginated = $teams->paginate($limit);
 
-        // ✅ Konversi setiap icon ke URL publik
         $paginated->getCollection()->transform(function ($team) {
-            $team->icon = $team->icon ? asset('storage/' . $team->icon) : null;
+            $team->icon = $this->makeIconPublicUrl($team->icon);
             return $team;
         });
 
         return ResponseFormatter::success($paginated, 'Teams found');
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $team = Team::findOrFail($id);
+
+            $team->name = $request->name;
+            $team->company_id = $request->company_id;
+
+            if ($request->hasFile('logo')) {
+                $path = $request->file('logo')->store('icons', 'public');
+                $team->icon = $path;
+            }
+
+            $team->save();
+            $team->icon = $this->makeIconPublicUrl($team->icon);
+
+            return ResponseFormatter::success($team, 'Team updated successfully');
+        } catch (Exception $e) {
+            return ResponseFormatter::error($e->getMessage(), 500);
+        }
+    }
+
+    public function destroy($id)
+    {
+        try {
+            $team = Team::findOrFail($id);
+            $team->delete();
+
+            return ResponseFormatter::success(null, 'Team deleted successfully');
+        } catch (Exception $e) {
+            return ResponseFormatter::error($e->getMessage(), 500);
+        }
     }
 }
